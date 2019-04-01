@@ -1,0 +1,7 @@
+{
+  "id" : "EmailManager",
+  "type" : "JavaService",
+  "packageNames" : [ "com.services.emailmanager" ],
+  "serviceClassNames" : [ "com.services.emailmanager.EmailManager" ],
+  "title" : "EmailManager"
+}
