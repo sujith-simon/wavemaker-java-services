@@ -3,24 +3,23 @@
  with the terms of the source code license agreement you entered into with wavemaker.com*/
 package com.services.emailmanager;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.annotation.PostConstruct;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import java.util.Properties;
-import javax.mail.Message;
+
 import javax.mail.Authenticator;
+import javax.mail.Message;
 import javax.mail.MessagingException;
+import javax.mail.PasswordAuthentication;
 import javax.mail.Session;
 import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
-import javax.mail.PasswordAuthentication;
-import com.wavemaker.runtime.security.SecurityService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.services.emailmanager.model.Authentication;
+import com.services.emailmanager.model.Email;
 import com.wavemaker.runtime.service.annotations.ExposeToClient;
-import com.wavemaker.runtime.service.annotations.HideFromClient;
 
 
 //import com.services.emailmanager.model.*;
@@ -41,50 +40,48 @@ import com.wavemaker.runtime.service.annotations.HideFromClient;
 public class EmailManager {
 
     private static final Logger logger = LoggerFactory.getLogger(EmailManager.class);
-    private Session session;
 
-    private boolean authentication=true;
+    private boolean authentication = true;
     private boolean smtpServerTTLSEnabled = true;
     private String host = "smtp.gmail.com";
     private String port = "587";
-    private String username="<Username>";
-    private String password="<password>";
 
-    @PostConstruct
-    public void init() throws Exception {
+    public Session createSession(Authentication authentication) {
         Properties props = new Properties();
         props.put("mail.smtp.auth", String.valueOf(authentication));
-        props.put("mail.smtp.starttls.enable",smtpServerTTLSEnabled);
+        props.put("mail.smtp.starttls.enable", smtpServerTTLSEnabled);
         props.put("mail.smtp.host", host);
         props.put("mail.smtp.port", port);
-        session = Session.getInstance(props, new Authenticator() {
+        return Session.getInstance(props, new Authenticator() {
             @Override
             protected PasswordAuthentication getPasswordAuthentication() {
-            return new PasswordAuthentication(username, password);
+                return new PasswordAuthentication(authentication.getUserId(), authentication.getPassword());
             }
         });
     }
 
-    public void sendEmail(String toEmailAddress, String emailSubject, String emailMessage) {
-        logger.info("toEmailAddress {}, emailSubject {}, emailMessage {} ",
-        toEmailAddress,emailSubject,emailMessage);
+    public void sendEmail(Authentication authentication, Email email) {
+        logger.info("Got email data : {}", email);
         try {
+            Session session = createSession(authentication);
             Message message = new MimeMessage(session);
-            message.setFrom(new InternetAddress(username));
-            String[] recipientList = toEmailAddress.split(",");
+            message.setFrom(new InternetAddress("support@wavemaker.com"));
+            message.setReplyTo(InternetAddress.parse("sujith.simon@wavemaker.com", false));
+
+            String[] recipientList = email.getTo().split(",");
             InternetAddress[] recipientAddresses = new InternetAddress[recipientList.length];
             int counter = 0;
-            for (String recipient: recipientList) {
+            for (String recipient : recipientList) {
                 recipientAddresses[counter] = new InternetAddress(recipient.trim());
                 counter++;
-                }
+            }
             message.setRecipients(Message.RecipientType.TO, recipientAddresses);
-            message.setSubject(emailSubject);
-            message.setText(emailMessage);
+            message.setSubject(email.getSubject());
+            message.setText(email.getBody());
             Transport.send(message);
             logger.info("Sent message successfully....");
-             } catch (MessagingException e) {
-                throw new RuntimeException(e);
-            }
+        } catch (MessagingException e) {
+            throw new RuntimeException(e);
         }
+    }
 }
